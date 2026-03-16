@@ -23,8 +23,6 @@ Windows Security Event Logs
         ↓
 Azure Log Analytics Workspace
         ↓
-Geolocation Enrichment
-        ↓
 Microsoft Sentinel (SIEM)
         ↓
 Threat Detection, Dashboards, and Investigation
@@ -72,7 +70,13 @@ Threat Detection, Dashboards, and Investigation
 1. Configure Resource group
 2. Create a Windows Virtual Machine in RG
 3. Allow inbound RDP traffic In NSG
-4. Leave the VM exposed to the internet to act as a honeypot
+4. Leave the VM exposed to the internet to act as a honeypot.
+
+Resource Group
+![AZURE-SOC-HoneyPot/RG-SOC-LAB.png](https://github.com/Dleach-hub/Azure-Cloud-SOC-HoneyPot/blob/main/AZURE-SOC-HoneyPot/RG-SOC-LAB.png)
+
+VM Setup
+![AZURE-SOC-HoneyPot/VM.png](https://github.com/Dleach-hub/Azure-Cloud-SOC-HoneyPot/blob/main/AZURE-SOC-HoneyPot/VM.png?raw=true)
 
 ---
 
@@ -86,6 +90,8 @@ Security events are collected from the VM using:
 
 These logs are forwarded to **Azure Log Analytics**.
 
+![https://github.com/Dleach-hub/Azure-Cloud-SOC-HoneyPot/blob/main/AZURE-SOC-HoneyPot/SENTINEL_KQL_LOGS.png?raw=true](https://github.com/Dleach-hub/Azure-Cloud-SOC-HoneyPot/blob/main/AZURE-SOC-HoneyPot/SENTINEL_KQL_LOGS.png)
+
 ---
 
 ## 3. Configure Log Analytics Workspace
@@ -93,6 +99,9 @@ These logs are forwarded to **Azure Log Analytics**.
 1. Create a Log Analytics Workspace
 2. Connect the Azure VM to the workspace
 3. Enable collection of **Windows Security Events**
+
+LAW
+![https://github.com/Dleach-hub/Azure-Cloud-SOC-HoneyPot/blob/main/AZURE-SOC-HoneyPot/LAW-SOC-LAB.png](https://github.com/Dleach-hub/Azure-Cloud-SOC-HoneyPot/blob/main/AZURE-SOC-HoneyPot/LAW-SOC-LAB.png)
 
 ---
 
@@ -102,72 +111,11 @@ These logs are forwarded to **Azure Log Analytics**.
 2. Connect it to the Log Analytics Workspace
 3. Begin ingesting logs for monitoring and threat detection
 
----
+Rule configuration
+![https://github.com/Dleach-hub/Azure-Cloud-SOC-HoneyPot/blob/main/AZURE-SOC-HoneyPot/SENTINEL_RULES.png](https://github.com/Dleach-hub/Azure-Cloud-SOC-HoneyPot/blob/main/AZURE-SOC-HoneyPot/SENTINEL_RULES.png)
 
-# Geolocation Enrichment
-
-To better understand attacker activity, captured IP addresses were enriched with **geolocation data**. This converts raw IP addresses into geographic information including:
-
-* Country
-* City
-* Latitude
-* Longitude
-
-This enrichment allows security events to be visualized geographically and helps identify which regions generate the most attack traffic.
-
-Example query used to identify attacking IP addresses:
-
-```kql
-SecurityEvent
-| where EventID == 4625
-| where IpAddress != "-"
-| summarize FailedAttempts = count() by IpAddress
-| order by FailedAttempts desc
-```
-
-The enriched data is then used for visualization in Sentinel dashboards.
-
----
-
-# Advanced Sentinel Detection Rules
-
-Custom **Microsoft Sentinel analytics rules** were created to detect suspicious activity and simulate real SOC alerting.
-
-## RDP Brute Force Detection
-
-Detects repeated login failures from the same IP address within a short time period.
-
-```kql
-SecurityEvent
-| where EventID == 4625
-| summarize AttemptCount = count() by IpAddress, bin(TimeGenerated, 5m)
-| where AttemptCount > 10
-```
-
-**Purpose**
-
-* Detect brute-force password attacks
-* Alert security analysts to suspicious activity
-* Identify automated attack sources
-
----
-
-## Suspicious Authentication Activity
-
-Highlights accounts receiving large numbers of failed login attempts.
-
-```kql
-SecurityEvent
-| where EventID == 4625
-| summarize FailedAttempts = count() by Account, IpAddress
-| where FailedAttempts > 20
-```
-
-**Purpose**
-
-* Identify targeted accounts
-* Detect credential-stuffing attempts
-* Highlight high-risk authentication behavior
+Incidents
+![https://github.com/Dleach-hub/Azure-Cloud-SOC-HoneyPot/blob/main/AZURE-SOC-HoneyPot/SENTINEL_INCIDENTS.png](https://github.com/Dleach-hub/Azure-Cloud-SOC-HoneyPot/blob/main/AZURE-SOC-HoneyPot/SENTINEL_INCIDENTS.png)
 
 ---
 
@@ -175,53 +123,16 @@ SecurityEvent
 
 A Microsoft Sentinel Workbook was created to visualize attacker activity on a global map.
 
+WorkBook with Attachers Location (8 Hrs)
+![https://github.com/Dleach-hub/Azure-Cloud-SOC-HoneyPot/blob/main/AZURE-SOC-HoneyPot/IP_ATTACK_MAP.png](https://github.com/Dleach-hub/Azure-Cloud-SOC-HoneyPot/blob/main/AZURE-SOC-HoneyPot/IP_ATTACK_MAP.png)
+
+WatchList
+![https://github.com/Dleach-hub/Azure-Cloud-SOC-HoneyPot/blob/main/AZURE-SOC-HoneyPot/MITRE_ATT%26CK.png](https://github.com/Dleach-hub/Azure-Cloud-SOC-HoneyPot/blob/main/AZURE-SOC-HoneyPot/SENTINEL_WATCHLIST.png)
+
 ---
 # MITRE ATT&CK Mapping
 
-Attacker behavior is mapped to the **MITRE ATT&CK** framework to standardize detections.
-
-| Observed Behavior                      | MITRE Tactic      | Technique                         | ID    |
-| -------------------------------------- | ----------------- | --------------------------------- | ----- |
-| RDP Brute Force                        | Credential Access | Brute Force                       | T1110 |
-| Targeting RDP Service                  | Lateral Movement  | Remote Services                   | T1021 |
-| Initial Public-Facing Exploit Attempts | Initial Access    | Exploit Public-Facing Application | T1190 |
-
-Mapping attacks to MITRE ATT&CK helps align the project with **industry best practices** and demonstrates a professional SOC workflow.
-
----
-
-# Custom Sentinel Workbook
-
-A **custom Sentinel workbook** aggregates logs, geolocation data, and detection results to provide a centralized SOC dashboard.
-
-### Features
-
-* 🌍 Global attack map
-* 📊 Failed login attempts over time
-* 🌐 Top attacking IP addresses
-* 🗺 Top attacking countries
-* 🔑 Most targeted user accounts
-
-
----
-
-# Security Monitoring Workflow
-
-```
-Internet Attackers
-        ↓
-Azure Honeypot VM
-        ↓
-Windows Security Logs
-        ↓
-Azure Log Analytics
-        ↓
-Geolocation Enrichment
-        ↓
-Microsoft Sentinel
-        ↓
-MITRE ATT&CK Mapping & Custom Workbook
-```
+![https://github.com/Dleach-hub/Azure-Cloud-SOC-HoneyPot/blob/main/AZURE-SOC-HoneyPot/MITRE_ATT%26CK%20(2).png](https://github.com/Dleach-hub/Azure-Cloud-SOC-HoneyPot/blob/main/AZURE-SOC-HoneyPot/MITRE_ATT%26CK%20(2).png)
 
 ---
 
